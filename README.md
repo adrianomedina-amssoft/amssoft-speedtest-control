@@ -34,3 +34,4 @@ alterar a VM.
 ## Suporte e seguranca
 
 Nao envie vulnerabilidades em uma issue publica. Consulte [SECURITY.md](SECURITY.md).
+Consulte tambem [DISTRIBUTION-POLICY.md](DISTRIBUTION-POLICY.md) para entender exatamente quais arquivos podem existir neste repositorio.

@@ -1,0 +1,17 @@
+# Este repositório é uma allowlist pública. Tudo é negado por padrão.
+/*
+
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/LICENSE
+!/SECURITY.md
+!/DISTRIBUTION-POLICY.md
+!/install.sh
+!/release-public.pem
+
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/distribution-policy.yml

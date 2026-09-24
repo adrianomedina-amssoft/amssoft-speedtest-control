@@ -1,0 +1,43 @@
+name: Distribution boundary
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce public allowlist and history hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/expected <<'EOF'
+          .gitattributes
+          .github/workflows/distribution-policy.yml
+          .gitignore
+          DISTRIBUTION-POLICY.md
+          LICENSE
+          README.md
+          SECURITY.md
+          install.sh
+          release-public.pem
+          EOF
+          git ls-files | LC_ALL=C sort > /tmp/actual
+          diff -u /tmp/expected /tmp/actual
+          test "$(git ls-files --stage -- install.sh | awk '{print $1}')" = 100755
+          grep -Fq -- '-----BEGIN PUBLIC KEY-----' release-public.pem
+          ! grep -Fq 'PRIVATE KEY' release-public.pem
+          while read -r commit; do
+            if git grep -I -q -E 'BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY|github_pat_|gh[pousr]_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|xox[baprs]-' "$commit" -- .; then
+              echo "Material sensível detectado no histórico." >&2
+              exit 1
+            fi
+          done < <(git rev-list --all)
