@@ -26,6 +26,26 @@ terminal.
 - nPerf;
 - medidor local AMS SOFT.
 
+## Tecnologias e serviços de terceiros
+
+O AMS SpeedTest Control é uma solução independente de gerenciamento, automação
+e observabilidade. A licença comercial da AMS SOFT cobre exclusivamente o
+painel, seus recursos de gestão, métricas, segurança, atualizações e suporte.
+
+Ookla, Speedtest, Minha Conexão e nPerf são produtos, serviços ou marcas
+pertencentes aos seus respectivos titulares. A AMS SOFT não vende, sublicencia
+nem reivindica propriedade sobre esses componentes. Quando solicitada pelo
+cliente, a plataforma apenas automatiza a obtenção, instalação, configuração e
+supervisão dos componentes disponibilizados por suas fontes oficiais, sempre
+sujeitos aos termos, requisitos e autorizações de cada fornecedor.
+
+O medidor local incorpora componentes do projeto LibreSpeed, distribuídos sob a
+licença GNU LGPLv3. Os avisos de autoria e a licença correspondente são
+preservados junto ao componente.
+
+A AMS SOFT não possui vínculo, patrocínio ou endosso dos titulares mencionados,
+salvo quando formalmente informado.
+
 ## Benefícios para o provedor
 
 - operação centralizada e mais simples;
