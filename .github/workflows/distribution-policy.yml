@@ -12,7 +12,7 @@ jobs:
   boundary:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Enforce public allowlist and history hygiene
@@ -35,8 +35,11 @@ jobs:
           test "$(git ls-files --stage -- install.sh | awk '{print $1}')" = 100755
           grep -Fq -- '-----BEGIN PUBLIC KEY-----' release-public.pem
           ! grep -Fq 'PRIVATE KEY' release-public.pem
+          private_key='PRIVATE'' KEY'
+          github_token='github_''pat_'
+          pattern="BEGIN ([A-Z0-9 ]+ )?${private_key}|${github_token}|gh[pousr]_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|xox[baprs]-"
           while read -r commit; do
-            if git grep -I -q -E 'BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY|github_pat_|gh[pousr]_[A-Za-z0-9_]+|AKIA[0-9A-Z]{16}|xox[baprs]-' "$commit" -- .; then
+            if git grep -I -q -E "$pattern" "$commit" -- . ':(exclude).github/workflows/distribution-policy.yml'; then
               echo "Material sensível detectado no histórico." >&2
               exit 1
             fi
