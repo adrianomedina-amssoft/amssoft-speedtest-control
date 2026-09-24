@@ -5,10 +5,13 @@ readonly DISTRIBUTION_REPOSITORY="adrianomedina-amssoft/amssoft-speedtest-contro
 readonly RELEASES_URL="https://github.com/${DISTRIBUTION_REPOSITORY}/releases"
 readonly RAW_MAIN_URL="https://raw.githubusercontent.com/${DISTRIBUTION_REPOSITORY}/main"
 readonly RELEASE_PUBLIC_KEY_SHA256="dc6e3cb302b3c395758c84fa4ecd5563bce5368b48fb6ccaa23094d48e8e7eaf"
+readonly DEFAULT_ADMIN_CIDRS="10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16,fc00::/7"
+readonly DEPLOYMENT_CONFIG="/etc/ams-speedtest-control/deployment.env"
 
 VERSION=""
 BOOTSTRAP_ARGS=()
 TEMP_DIR=""
+ADMIN_CIDR_EXPLICIT=0
 
 usage() {
     cat <<'EOF'
@@ -50,6 +53,53 @@ download() {
         --output "$destination" "$url"
 }
 
+verify_bootstrap() {
+    local public_key="$1" bootstrap="$2" signature="$3"
+    openssl dgst -sha256 \
+        -verify "$public_key" \
+        -signature "$signature" \
+        "$bootstrap" >/dev/null ||
+        fail "a assinatura do bootstrap e invalida"
+}
+
+valid_ip_address() {
+    perl -MSocket=AF_INET,AF_INET6,inet_pton -e '
+        exit !(defined inet_pton(index($ARGV[0], ":") >= 0 ? AF_INET6 : AF_INET, $ARGV[0]));
+    ' "$1"
+}
+
+detect_ssh_client_address() {
+    local connection="${SSH_CONNECTION:-}" process_id="${PPID:-}" parent_id depth=0
+    while [[ -z "$connection" && "$process_id" =~ ^[0-9]+$ && "$process_id" -gt 1 && "$depth" -lt 12 ]]; do
+        if [[ -r "/proc/${process_id}/environ" ]]; then
+            connection="$(tr '\0' '\n' < "/proc/${process_id}/environ" |
+                sed -n 's/^SSH_CONNECTION=\([^ ]*\) .*/\1/p' | head -n1)"
+        fi
+        [[ -r "/proc/${process_id}/stat" ]] || break
+        parent_id="$(awk '{print $4}' "/proc/${process_id}/stat")"
+        [[ "$parent_id" != "$process_id" ]] || break
+        process_id="$parent_id"
+        depth=$((depth + 1))
+    done
+
+    connection="${connection%% *}"
+    [[ -n "$connection" ]] && valid_ip_address "$connection" && printf '%s\n' "$connection"
+}
+
+prepare_initial_admin_cidr() {
+    [[ "$ADMIN_CIDR_EXPLICIT" -eq 0 ]] || return 0
+    [[ ! -e "$DEPLOYMENT_CONFIG" ]] || return 0
+
+    local client_address prefix
+    client_address="$(detect_ssh_client_address || true)"
+    [[ -n "$client_address" ]] || return 0
+    prefix=32
+    [[ "$client_address" == *:* ]] && prefix=128
+    BOOTSTRAP_ARGS+=(--admin-cidr "${DEFAULT_ADMIN_CIDRS},${client_address}/${prefix}")
+    printf '[instalador] Acesso administrativo inicial autorizado para o operador SSH atual (%s).\n' \
+        "${client_address}/${prefix}"
+}
+
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -62,6 +112,7 @@ parse_arguments() {
             --admin-cidr|--server-name)
                 [[ $# -ge 2 ]] || fail "$1 exige um valor"
                 BOOTSTRAP_ARGS+=("$1" "$2")
+                [[ "$1" != "--admin-cidr" ]] || ADMIN_CIDR_EXPLICIT=1
                 shift 2
                 ;;
             --no-start)
@@ -98,6 +149,7 @@ preflight() {
 main() {
     parse_arguments "$@"
     preflight
+    prepare_initial_admin_cidr
     [[ -n "$VERSION" ]] || VERSION="$(detect_latest_version)"
     validate_version "$VERSION"
 
@@ -110,7 +162,6 @@ main() {
 
     printf '[instalador] Baixando AMS SpeedTest Control %s\n' "$VERSION"
     download "${RAW_MAIN_URL}/release-public.pem" "${TEMP_DIR}/release-public.pem"
-    download "${asset_base}/verify-bootstrap.sh" "${TEMP_DIR}/verify-bootstrap.sh"
     download "${asset_base}/bootstrap.sh" "${TEMP_DIR}/bootstrap.sh"
     download "${asset_base}/bootstrap.sh.sig" "${TEMP_DIR}/bootstrap.sh.sig"
     download "${asset_base}/manifest.sha256" "${TEMP_DIR}/manifest.sha256"
@@ -125,7 +176,7 @@ main() {
         fail "a chave publica baixada nao corresponde a ancora do instalador"
 
     printf '[instalador] Validando bootstrap e release assinada\n'
-    bash "${TEMP_DIR}/verify-bootstrap.sh" \
+    verify_bootstrap \
         "${TEMP_DIR}/release-public.pem" \
         "${TEMP_DIR}/bootstrap.sh" \
         "${TEMP_DIR}/bootstrap.sh.sig"
