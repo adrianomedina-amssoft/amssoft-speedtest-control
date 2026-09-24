@@ -43,4 +43,11 @@ jobs:
               echo "Material sensível detectado no histórico." >&2
               exit 1
             fi
+            if git show "$commit:.github/workflows/distribution-policy.yml" >/tmp/workflow-at-commit 2>/dev/null; then
+              grep -Ev '^\s*(private_key|github_token|pattern)=|^\s*if git grep ' /tmp/workflow-at-commit > /tmp/workflow-without-scanner || true
+              if grep -I -q -E "$pattern" /tmp/workflow-without-scanner; then
+                echo "Material sensível detectado no histórico do workflow." >&2
+                exit 1
+              fi
+            fi
           done < <(git rev-list --all)
