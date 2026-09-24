@@ -32,7 +32,7 @@ O AMS SpeedTest Control é uma solução independente de gerenciamento, automaç
 e observabilidade. A licença comercial da AMS SOFT cobre exclusivamente o
 painel, seus recursos de gestão, métricas, segurança, atualizações e suporte.
 
-Ookla, Minha Conexão e nPerf são produtos, serviços ou marcas
+Ookla, Speedtest, Minha Conexão e nPerf são produtos, serviços ou marcas
 pertencentes aos seus respectivos titulares. A AMS SOFT não vende, sublicencia
 nem reivindica propriedade sobre esses componentes. Quando solicitada pelo
 cliente, a plataforma apenas automatiza a obtenção, instalação, configuração e
@@ -66,6 +66,7 @@ curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/re
 
 - VM ou servidor com Debian 12 `amd64`;
 - acesso `root` ou `sudo` para a instalação;
+- conexão HTTPS com o GitHub e com o serviço de licenciamento;
 - licença comercial válida para liberar as operações e os medidores.
 
 ## Primeiro acesso

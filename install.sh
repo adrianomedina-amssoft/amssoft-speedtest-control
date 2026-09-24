@@ -4,7 +4,7 @@ set -euo pipefail
 readonly DISTRIBUTION_REPOSITORY="adrianomedina-amssoft/amssoft-speedtest-control"
 readonly RELEASES_URL="https://github.com/${DISTRIBUTION_REPOSITORY}/releases"
 readonly RAW_MAIN_URL="https://raw.githubusercontent.com/${DISTRIBUTION_REPOSITORY}/main"
-readonly RELEASE_PUBLIC_KEY_SHA256="dc6e3cb302b3c395758c84fa4ecd5563bce5368b48fb6ccaa23094d48e8e7eaf"
+readonly RELEASE_PUBLIC_KEY_SHA256="9069fad97459e02e21c6e68cf9a0a3bae374b0dec815227594e5621f45b668ae"
 readonly DEFAULT_ADMIN_CIDRS="10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16,fc00::/7"
 readonly DEPLOYMENT_CONFIG="/etc/ams-speedtest-control/deployment.env"
 
@@ -86,18 +86,36 @@ detect_ssh_client_address() {
     [[ -n "$connection" ]] && valid_ip_address "$connection" && printf '%s\n' "$connection"
 }
 
+administrative_network_for_address() {
+    perl -MSocket=AF_INET,AF_INET6,inet_pton,inet_ntop -e '
+        my $address = $ARGV[0];
+        if (index($address, ":") >= 0) {
+            my $packed = inet_pton(AF_INET6, $address) or exit 1;
+            substr($packed, 8, 8, "\0" x 8);
+            print inet_ntop(AF_INET6, $packed), "/64";
+        } else {
+            my $packed = inet_pton(AF_INET, $address) or exit 1;
+            my $network = unpack("N", $packed) & 0xffffff00;
+            print inet_ntop(AF_INET, pack("N", $network)), "/24";
+        }
+    ' "$1"
+}
+
+deployment_config_exists() {
+    [[ -e "$DEPLOYMENT_CONFIG" ]]
+}
+
 prepare_initial_admin_cidr() {
     [[ "$ADMIN_CIDR_EXPLICIT" -eq 0 ]] || return 0
-    [[ ! -e "$DEPLOYMENT_CONFIG" ]] || return 0
+    ! deployment_config_exists || return 0
 
-    local client_address prefix
+    local client_address client_network
     client_address="$(detect_ssh_client_address || true)"
     [[ -n "$client_address" ]] || return 0
-    prefix=32
-    [[ "$client_address" == *:* ]] && prefix=128
-    BOOTSTRAP_ARGS+=(--admin-cidr "${DEFAULT_ADMIN_CIDRS},${client_address}/${prefix}")
+    client_network="$(administrative_network_for_address "$client_address")"
+    BOOTSTRAP_ARGS+=(--admin-cidr "${DEFAULT_ADMIN_CIDRS},${client_network}")
     printf '[instalador] Acesso administrativo inicial autorizado para o operador SSH atual (%s).\n' \
-        "${client_address}/${prefix}"
+        "$client_network"
 }
 
 parse_arguments() {
