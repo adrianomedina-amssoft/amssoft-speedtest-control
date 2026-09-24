@@ -36,19 +36,11 @@ terminal.
 
 ## Instalação
 
-A release estável `v1.0.0` já está publicada. O comando automático para novas
-instalações será:
+Para baixar e instalar o AMS SpeedTest Control, execute:
 
 ```bash
 curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/releases/latest/download/install.sh | sudo bash
 ```
-
-> O arquivo `install.sh` ainda não foi incluído nos downloads da release
-> `v1.0.0`. Por isso, não utilize o comando acima até uma release estável mais
-> recente disponibilizar esse arquivo.
-
-O instalador utiliza somente uma release estável publicada e verifica a
-autenticidade e a integridade dos arquivos antes de alterar o servidor.
 
 ## Requisitos
 
