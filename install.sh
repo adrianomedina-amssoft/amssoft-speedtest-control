@@ -101,6 +101,27 @@ administrative_network_for_address() {
     ' "$1"
 }
 
+read_installed_server_name() {
+    local config_path="$1" server_name
+    [[ -r "$config_path" ]] || return 1
+    server_name="$(sed -n 's/^AMS_CONTROL_SERVER_NAME=//p' "$config_path" | tail -n1)"
+    [[ -n "$server_name" ]] || return 1
+    if valid_ip_address "$server_name" || [[ "$server_name" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
+        printf '%s\n' "$server_name"
+        return 0
+    fi
+    return 1
+}
+
+admin_url_for_server_name() {
+    local server_name="$1"
+    if [[ "$server_name" == *:* ]]; then
+        printf 'https://[%s]/admin/\n' "$server_name"
+    else
+        printf 'https://%s/admin/\n' "$server_name"
+    fi
+}
+
 deployment_config_exists() {
     [[ -e "$DEPLOYMENT_CONFIG" ]]
 }
@@ -171,7 +192,7 @@ main() {
     [[ -n "$VERSION" ]] || VERSION="$(detect_latest_version)"
     validate_version "$VERSION"
 
-    local tag asset_base bundle
+    local tag asset_base bundle server_name admin_url
     tag="v${VERSION}"
     asset_base="${RELEASES_URL}/download/${tag}"
     bundle="ams-speedtest-control-${VERSION}-linux-amd64.tar.gz"
@@ -206,8 +227,12 @@ main() {
         --public-key "${TEMP_DIR}/release-public.pem" \
         "${BOOTSTRAP_ARGS[@]}"
 
+    server_name="$(read_installed_server_name /etc/default/ams-speedtest-control)" ||
+        fail "a instalacao terminou sem um endereco administrativo valido"
+    admin_url="$(admin_url_for_server_name "$server_name")"
+
     printf '\nAMS SpeedTest Control %s instalado com sucesso.\n' "$VERSION"
-    printf 'Acesse https://IP-DA-VM/admin/ para concluir a configuracao.\n'
+    printf 'Acesse %s para concluir a configuracao.\n' "$admin_url"
 }
 
 if [[ "${AMS_INSTALLER_LIBRARY_MODE:-0}" != "1" ]]; then
