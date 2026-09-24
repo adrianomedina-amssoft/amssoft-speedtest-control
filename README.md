@@ -36,16 +36,16 @@ terminal.
 
 ## Instalação
 
-Quando a primeira release estável estiver publicada, uma nova instalação poderá
-ser iniciada dentro da VM com:
+A release estável `v1.0.0` já está publicada. O comando automático para novas
+instalações será:
 
 ```bash
 curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/releases/latest/download/install.sh | sudo bash
 ```
 
-> A versão `v1.0.0` ainda está em preparação. Não utilize o comando acima até a
-> release aparecer como publicada e o arquivo `install.sh` estar disponível entre
-> os downloads da versão.
+> O arquivo `install.sh` ainda não foi incluído nos downloads da release
+> `v1.0.0`. Por isso, não utilize o comando acima até uma release estável mais
+> recente disponibilizar esse arquivo.
 
 O instalador utiliza somente uma release estável publicada e verifica a
 autenticidade e a integridade dos arquivos antes de alterar o servidor.
