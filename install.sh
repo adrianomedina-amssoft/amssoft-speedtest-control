@@ -5,7 +5,7 @@ readonly DISTRIBUTION_REPOSITORY="adrianomedina-amssoft/amssoft-speedtest-contro
 readonly RELEASES_URL="https://github.com/${DISTRIBUTION_REPOSITORY}/releases"
 readonly RAW_MAIN_URL="https://raw.githubusercontent.com/${DISTRIBUTION_REPOSITORY}/main"
 readonly RELEASE_PUBLIC_KEY_SHA256="9069fad97459e02e21c6e68cf9a0a3bae374b0dec815227594e5621f45b668ae"
-readonly DEFAULT_ADMIN_CIDRS="10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16"
+readonly DEFAULT_ADMIN_CIDRS="10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16,2000::/3"
 readonly DEPLOYMENT_CONFIG="/etc/ams-speedtest-control/deployment.env"
 
 VERSION=""
@@ -134,7 +134,7 @@ prepare_initial_admin_cidr() {
     client_address="$(detect_ssh_client_address || true)"
     [[ -n "$client_address" ]] || return 0
     if [[ "$client_address" == *:* ]]; then
-        printf '[instalador] SSH por IPv6 detectado. IPv6 administrativo permanece desativado; use --admin-cidr explicitamente se este for o unico caminho de acesso.\n'
+        printf '[instalador] Primeiro acesso IPv6 global coberto por 2000::/3. Depois do login, cadastre e teste seu prefixo antes de remover essa faixa ampla.\n'
         return 0
     fi
     client_network="$(administrative_network_for_address "$client_address")"
