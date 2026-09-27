@@ -11,6 +11,7 @@ readonly DEPLOYMENT_CONFIG="/etc/ams-speedtest-control/deployment.env"
 VERSION=""
 BOOTSTRAP_ARGS=()
 TEMP_DIR=""
+MIGRATION_DIR=""
 ADMIN_CIDR_EXPLICIT=0
 
 usage() {
@@ -27,9 +28,94 @@ fail() {
 }
 
 cleanup() {
+    if [[ -n "$MIGRATION_DIR" && "$MIGRATION_DIR" == /var/lib/ams-speedtest-control-privileged/legacy-migration.* && -d "$MIGRATION_DIR" ]]; then
+        rm -rf -- "$MIGRATION_DIR"
+    fi
     if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
         rm -rf -- "$TEMP_DIR"
     fi
+}
+
+existing_installation() {
+    [[ -e /usr/lib/ams-speedtest-control/VERSION ||
+       -e /usr/lib/ams-speedtest-control/ams-speedtest-agent ||
+       -e /usr/lib/ams-speedtest-control/ams-speedtest-control ||
+       -e /etc/ams-speedtest-control/release-public.pem ]]
+}
+
+verify_release_bundle() {
+    local key="$1" bundle="$2" manifest="$3" signature="$4" expected_line expected_hash
+    openssl dgst -sha256 -verify "$key" -signature "$signature" "$manifest" >/dev/null ||
+        fail "a assinatura do manifesto e invalida"
+    expected_line="$(tr -d '\r' < "$manifest")"
+    [[ "$expected_line" =~ ^[0-9a-f]{64}[[:space:]][[:space:]]ams-speedtest-control-[0-9]+\.[0-9]+\.[0-9]+-linux-amd64\.tar\.gz$ ]] ||
+        fail "manifesto da release invalido"
+    [[ "${expected_line#*  }" == "$(basename "$bundle")" ]] ||
+        fail "manifesto nao corresponde ao pacote"
+    expected_hash="${expected_line%% *}"
+    [[ "$(sha256sum "$bundle" | awk '{print $1}')" == "$expected_hash" ]] ||
+        fail "checksum do pacote invalido"
+}
+
+migrate_existing_installation() {
+    local bundle="$1"
+    local key=/etc/ams-speedtest-control/release-public.pem
+    local installed_version installed_key_owner status
+    [[ "${#BOOTSTRAP_ARGS[@]}" -eq 0 ]] ||
+        fail "em migracao existente, configure dominio e redes pelo painel; opcoes de bootstrap nao se aplicam"
+    [[ -f /usr/lib/ams-speedtest-control/VERSION && ! -L /usr/lib/ams-speedtest-control/VERSION &&
+       -f /usr/lib/ams-speedtest-control/ams-speedtest-agent && ! -L /usr/lib/ams-speedtest-control/ams-speedtest-agent &&
+       -f /usr/lib/ams-speedtest-control/ams-speedtest-control && ! -L /usr/lib/ams-speedtest-control/ams-speedtest-control &&
+       -f "$key" && ! -L "$key" ]] || fail "instalacao existente incompleta; nenhuma alteracao foi feita"
+    installed_key_owner="$(stat -c '%u:%g:%a' "$key")"
+    [[ "$installed_key_owner" == 0:0:644 ]] || fail "chave de release instalada possui permissoes inseguras"
+    cmp -s "$key" "${TEMP_DIR}/release-public.pem" ||
+        fail "chave baixada difere da chave instalada; rotacao exige procedimento separado"
+    installed_version="$(tr -d '\r\n' < /usr/lib/ams-speedtest-control/VERSION)"
+    validate_version "$installed_version"
+    [[ "$(printf '%s\n%s\n' "$installed_version" "$VERSION" | sort -V | tail -n1)" == "$VERSION" ]] ||
+        fail "downgrade de versao nao permitido"
+    [[ "$(printf '%s\n%s\n' 1.0.11 "$VERSION" | sort -V | tail -n1)" == "$VERSION" ]] ||
+        fail "esta release ainda nao oferece a migracao protegida; aguarde v1.0.11 ou posterior"
+    verify_release_bundle "$key" "${TEMP_DIR}/${bundle}" "${TEMP_DIR}/manifest.sha256" "${TEMP_DIR}/manifest.sha256.sig"
+    command -v sqlite3 >/dev/null || fail "sqlite3 e obrigatorio para backup da migracao"
+    command -v systemd-run >/dev/null || fail "systemd-run e obrigatorio para migracao protegida"
+    local service
+    for service in ams-speedtest-control.service ams-speedtest-agent.service ams-license-guard.service; do
+        systemctl is-active --quiet "$service" || fail "$service deve estar ativo antes da migracao"
+    done
+    [[ ! -L /var/lib/ams-speedtest-control-privileged ]] || fail "diretorio privilegiado inseguro"
+    install -d -o root -g root -m 0700 /var/lib/ams-speedtest-control-privileged
+    [[ "$(stat -c '%u:%g:%a' /var/lib/ams-speedtest-control-privileged)" == 0:0:700 ]] ||
+        fail "diretorio privilegiado inseguro"
+    MIGRATION_DIR="$(mktemp -d /var/lib/ams-speedtest-control-privileged/legacy-migration.XXXXXX)"
+    install -o root -g root -m 0600 "${TEMP_DIR}/${bundle}" "${MIGRATION_DIR}/${bundle}"
+    install -o root -g root -m 0600 "${TEMP_DIR}/manifest.sha256" "${MIGRATION_DIR}/manifest.sha256"
+    install -o root -g root -m 0600 "${TEMP_DIR}/manifest.sha256.sig" "${MIGRATION_DIR}/manifest.sha256.sig"
+    install -o root -g root -m 0600 "${TEMP_DIR}/CHANGELOG-${VERSION}.md" "${MIGRATION_DIR}/CHANGELOG-${VERSION}.md"
+    tar -xOf "${MIGRATION_DIR}/${bundle}" ./bin/ams-speedtest-agent > "${MIGRATION_DIR}/migration-agent"
+    chmod 0700 "${MIGRATION_DIR}/migration-agent"
+    [[ -s "${MIGRATION_DIR}/migration-agent" && ! -L "${MIGRATION_DIR}/migration-agent" ]] ||
+        fail "agente candidato ausente no pacote assinado"
+    sqlite3 /var/lib/ams-speedtest-control/control.db ".backup '${MIGRATION_DIR}/before-migration.db'"
+    chmod 0600 "${MIGRATION_DIR}/before-migration.db"
+    [[ "$(sqlite3 "${MIGRATION_DIR}/before-migration.db" 'PRAGMA integrity_check;')" == ok ]] ||
+        fail "backup do banco nao passou na verificacao de integridade"
+    printf '[instalador] Migrando %s para %s com recuperacao automatica protegida\n' "$installed_version" "$VERSION"
+    systemd-run --unit=ams-control-product-update \
+        --property=OnFailure=ams-control-update-recover-failure.service --collect --wait \
+        "${MIGRATION_DIR}/migration-agent" --migrate-update \
+        "${MIGRATION_DIR}/${bundle}" "${MIGRATION_DIR}/manifest.sha256" \
+        "${MIGRATION_DIR}/manifest.sha256.sig" "${MIGRATION_DIR}/CHANGELOG-${VERSION}.md" \
+        "${MIGRATION_DIR}/before-migration.db" || fail "migracao falhou; verifique o status e a recuperacao"
+    status="$(jq -r '.status // empty' /var/lib/ams-speedtest-control/update-status.json 2>/dev/null || true)"
+    [[ "$status" == succeeded && "$(tr -d '\r\n' < /usr/lib/ams-speedtest-control/VERSION)" == "$VERSION" ]] ||
+        fail "migracao nao terminou com status saudavel"
+    for service in ams-speedtest-control.service ams-speedtest-agent.service ams-license-guard.service; do
+        systemctl is-active --quiet "$service" || fail "$service indisponivel apos migracao"
+    done
+    curl --fail --silent --show-error --insecure https://127.0.0.1/admin/api/v1/health >/dev/null ||
+        fail "API indisponivel apos migracao"
 }
 
 validate_version() {
@@ -184,7 +270,7 @@ preflight() {
     [[ "$os_id" == "debian" && "$os_version" == "12" && "$architecture" == "amd64" ]] ||
         fail "plataforma nao suportada: esperado Debian 12 amd64"
 
-    for command_name in curl openssl sha256sum tar perl systemctl; do
+    for command_name in curl openssl sha256sum tar perl systemctl sort; do
         command -v "$command_name" >/dev/null 2>&1 || fail "comando obrigatorio ausente: $command_name"
     done
 }
@@ -192,7 +278,9 @@ preflight() {
 main() {
     parse_arguments "$@"
     preflight
-    prepare_initial_admin_cidr
+    if ! existing_installation; then
+        prepare_initial_admin_cidr
+    fi
     [[ -n "$VERSION" ]] || VERSION="$(detect_latest_version)"
     validate_version "$VERSION"
 
@@ -210,6 +298,9 @@ main() {
     download "${asset_base}/manifest.sha256" "${TEMP_DIR}/manifest.sha256"
     download "${asset_base}/manifest.sha256.sig" "${TEMP_DIR}/manifest.sha256.sig"
     download "${asset_base}/${bundle}" "${TEMP_DIR}/${bundle}"
+    if existing_installation; then
+        download "${asset_base}/CHANGELOG-${VERSION}.md" "${TEMP_DIR}/CHANGELOG-${VERSION}.md"
+    fi
 
     local downloaded_key_hash
     downloaded_key_hash="$(sha256sum "${TEMP_DIR}/release-public.pem" | awk '{print $1}')"
@@ -224,12 +315,16 @@ main() {
         "${TEMP_DIR}/bootstrap.sh" \
         "${TEMP_DIR}/bootstrap.sh.sig"
 
-    bash "${TEMP_DIR}/bootstrap.sh" \
-        --bundle "${TEMP_DIR}/${bundle}" \
-        --manifest "${TEMP_DIR}/manifest.sha256" \
-        --signature "${TEMP_DIR}/manifest.sha256.sig" \
-        --public-key "${TEMP_DIR}/release-public.pem" \
-        "${BOOTSTRAP_ARGS[@]}"
+    if existing_installation; then
+        migrate_existing_installation "$bundle"
+    else
+        bash "${TEMP_DIR}/bootstrap.sh" \
+            --bundle "${TEMP_DIR}/${bundle}" \
+            --manifest "${TEMP_DIR}/manifest.sha256" \
+            --signature "${TEMP_DIR}/manifest.sha256.sig" \
+            --public-key "${TEMP_DIR}/release-public.pem" \
+            "${BOOTSTRAP_ARGS[@]}"
+    fi
 
     server_name="$(read_installed_server_name /etc/default/ams-speedtest-control)" ||
         fail "a instalacao terminou sem um endereco administrativo valido"
