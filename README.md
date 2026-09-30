@@ -64,8 +64,8 @@ curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/re
 
 ### Atualização de instalações antigas
 
-Para a primeira atualização de uma instalação anterior à versão 1.0.11,
-execute novamente o comando de instalação acima por SSH. O instalador novo
+Para a primeira atualização de uma instalação até a versão 1.0.11,
+para a versão 1.0.12 ou posterior, execute novamente o comando de instalação acima por SSH. O instalador novo
 identifica o sistema existente, verifica a assinatura da release com a chave
 já instalada e usa uma migração protegida com recuperação automática. Ele
 preserva as configurações e o banco; não executa uma instalação limpa nem
@@ -73,7 +73,7 @@ substitui a chave de confiança. Se a chave instalada não corresponder à da
 release, interrompa a operação e contate o suporte.
 
 O botão **Atualizar** de uma versão antiga continua executando o agente antigo
-e não recebe retroativamente essa proteção. Depois da migração protegida, as
+e não recebe retroativamente a migração de DNS nem seu rollback. Depois da migração protegida, as
 atualizações seguintes podem ser feitas pelo painel. Este procedimento passa
 a valer quando uma release que o inclua for publicada; o código local em
 desenvolvimento ainda não é uma atualização oficial.
@@ -84,6 +84,12 @@ desenvolvimento ainda não é uma atualização oficial.
 - acesso `root` ou `sudo` para a instalação;
 - conexão HTTPS com o GitHub e com o serviço de licenciamento;
 - licença comercial válida para liberar as operações e os medidores.
+
+A partir da versão 1.0.12, instalação e migração pelo instalador configuram
+DNS públicos `1.1.1.1` e `8.8.8.8`, com backup do estado anterior. Estes
+resolvedores precisam estar acessíveis por UDP/TCP 53. Redes que dependem de
+zonas DNS privadas devem avaliar essa política antes de instalar ou atualizar.
+O download inicial ainda depende de o DNS existente resolver o GitHub.
 
 ## Primeiro acesso
 
