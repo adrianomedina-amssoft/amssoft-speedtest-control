@@ -169,6 +169,26 @@ O download inicial exige resolução funcional do GitHub. Os DNS públicos preci
 
 Esta versão reúne as melhorias de operação, administração e medição validadas para o pacote assinado.
 
+### AMS SpeedTest Control 1.0.9 (rascunho descontinuado)
+
+Atualização de confiabilidade do licenciamento e da recuperação dos medidores.
+
+#### Correções
+
+- preserva a tolerância offline quando o servidor de licenças está
+  temporariamente indisponível;
+- mantém o bloqueio imediato para licenças realmente inválidas, suspensas,
+  expiradas, revogadas ou clonadas;
+- restaura os medidores com segurança depois da regularização da licença;
+- impede que a falha isolada de um medidor bloqueie novamente toda a
+  instalação.
+
+#### Validação
+
+- testes automatizados de licença, agente, guardião, firewall e serviços;
+- verificação do adaptador contra o exemplo oficial instalado no WHMCS;
+- recuperação controlada do piloto e conferência pelo painel e pelo host.
+
 ### AMS SpeedTest Control 1.0.8
 
 Hotfix de segurança e confiabilidade para o servidor Ookla.
