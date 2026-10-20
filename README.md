@@ -64,19 +64,18 @@ curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/re
 
 ### Atualização de instalações antigas
 
-Para a primeira atualização de uma instalação até a versão 1.0.11,
-para a versão 1.0.12 ou posterior, execute novamente o comando de instalação acima por SSH. O instalador novo
-identifica o sistema existente, verifica a assinatura da release com a chave
-já instalada e usa uma migração protegida com recuperação automática. Ele
-preserva as configurações e o banco; não executa uma instalação limpa nem
-substitui a chave de confiança. Se a chave instalada não corresponder à da
-release, interrompa a operação e contate o suporte.
+Para atualizar uma instalação existente para a versão 1.0.23, use o instalador
+oficial por SSH:
 
-O botão **Atualizar** de uma versão antiga continua executando o agente antigo
-e não recebe retroativamente a migração de DNS nem seu rollback. Depois da migração protegida, as
-atualizações seguintes podem ser feitas pelo painel. Este procedimento passa
-a valer quando uma release que o inclua for publicada; o código local em
-desenvolvimento ainda não é uma atualização oficial.
+```bash
+curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/releases/latest/download/install.sh | sudo bash -s -- --version 1.0.23
+```
+
+O instalador identifica o sistema existente, verifica a assinatura com a chave
+já instalada e preserva as configurações e o banco, com recuperação automática
+em caso de falha. Após essa etapa, as próximas atualizações podem ser feitas
+pelo painel. Se a chave instalada não corresponder à da release, interrompa
+a operação e contate o suporte.
 
 ## Requisitos
 
