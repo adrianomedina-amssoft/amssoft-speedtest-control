@@ -64,11 +64,11 @@ curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/re
 
 ### Atualização de instalações antigas
 
-Para atualizar uma instalação existente para a versão 1.0.23, use o instalador
-oficial por SSH:
+Para atualizar uma instalação existente para a versão estável mais recente,
+execute o instalador oficial por SSH:
 
 ```bash
-curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/releases/latest/download/install.sh | sudo bash -s -- --version 1.0.23
+curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/releases/latest/download/install.sh | sudo bash
 ```
 
 O instalador identifica o sistema existente, verifica a assinatura com a chave
