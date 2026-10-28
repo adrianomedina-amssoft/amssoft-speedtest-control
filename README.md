@@ -62,21 +62,6 @@ Para baixar e instalar o AMS SpeedTest Control, execute:
 curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/releases/latest/download/install.sh | sudo bash
 ```
 
-### Atualização de instalações antigas
-
-Para atualizar uma instalação existente para a versão estável mais recente,
-execute o instalador oficial por SSH:
-
-```bash
-curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/releases/latest/download/install.sh | sudo bash
-```
-
-O instalador identifica o sistema existente, verifica a assinatura com a chave
-já instalada e preserva as configurações e o banco, com recuperação automática
-em caso de falha. Após essa etapa, as próximas atualizações podem ser feitas
-pelo painel. Se a chave instalada não corresponder à da release, interrompa
-a operação e contate o suporte.
-
 ## Requisitos
 
 - VM ou servidor com Debian 12 `amd64`;
