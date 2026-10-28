@@ -122,21 +122,70 @@ validate_version() {
     [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "versao invalida; use somente X.Y.Z estavel"
 }
 
+# One budget per resource, including retries and backoff. Never retry integrity checks.
+fetch_https() {
+    local url="$1" destination="$2" label="$3" method="${4:-GET}"
+    local attempt rc metadata code effective remaining timeout delay=2
+    local started=$SECONDS
+    local -a method_args=()
+    [[ "$method" != HEAD ]] || method_args=(--head)
+    for ((attempt = 1; attempt <= 8; attempt++)); do
+        remaining=$((600 - SECONDS + started))
+        ((remaining > 0)) || break
+        timeout=90
+        ((remaining >= timeout)) || timeout=$remaining
+        printf '[instalador] %s: tentativa %s/8\n' "$label" "$attempt" >&2
+        rc=0
+        metadata="$(curl --disable --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --fail --silent --show-error --location --max-redirs 10 \
+            --connect-timeout 15 --max-time "$timeout" "${method_args[@]}" \
+            --output "$destination" --write-out $'%{http_code}\n%{url_effective}' \
+            "$url" 2>/dev/null)" || rc=$?
+        code="${metadata%%$'\n'*}"
+        effective="${metadata#*$'\n'}"
+        if [[ "$rc" -eq 0 && "$code" == 200 ]]; then
+            printf '%s\n' "$effective"
+            return 0
+        fi
+        # curl 35 is an intermittent TLS handshake failure; certificate errors
+        # (notably 51/60/77) are intentionally excluded.
+        case "$rc:$code" in
+            5:*|6:*|7:*|18:*|28:*|35:*|52:*|55:*|56:*|22:408|22:429|22:500|22:502|22:503|22:504) ;;
+            *)
+                printf '[instalador] %s: falha nao recuperavel (curl=%s, HTTP=%s).\n' "$label" "$rc" "$code" >&2
+                return 1
+                ;;
+        esac
+        remaining=$((600 - SECONDS + started))
+        if ((attempt == 8 || remaining <= delay)); then
+            break
+        fi
+        printf '[instalador] %s: conexao temporariamente indisponivel (curl=%s, HTTP=%s); nova tentativa em %ss.\n' \
+            "$label" "$rc" "$code" "$delay" >&2
+        sleep "$delay"
+        delay=$((delay * 2))
+        ((delay <= 30)) || delay=30
+    done
+    printf '[instalador] %s: limite de tentativas ou de 600s atingido; download interrompido.\n' "$label" >&2
+    return 1
+}
+
 detect_latest_version() {
     local effective tag
-    effective="$(curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
-        --location --head --output /dev/null --write-out '%{url_effective}' \
-        "${RELEASES_URL}/latest")"
+    effective="$(fetch_https "${RELEASES_URL}/latest" /dev/null 'Consultar ultima versao' HEAD)" ||
+        fail "nao foi possivel consultar a release mais recente"
     tag="${effective##*/}"
     [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || fail "a release mais recente nao e uma versao estavel"
     printf '%s\n' "${BASH_REMATCH[1]}"
 }
 
 download() {
-    local url="$1" destination="$2"
-    curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
-        --location --retry 3 --retry-all-errors --connect-timeout 15 \
-        --output "$destination" "$url"
+    local url="$1" destination="$2" partial="${2}.part"
+    if ! fetch_https "$url" "$partial" "$(basename "$destination")" >/dev/null; then
+        rm -f -- "$partial"
+        fail "nao foi possivel baixar $(basename "$destination"); nenhum arquivo incompleto sera instalado"
+    fi
+    mv -f -- "$partial" "$destination"
 }
 
 verify_bootstrap() {
