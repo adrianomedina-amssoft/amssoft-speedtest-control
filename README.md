@@ -69,12 +69,6 @@ curl -fsSL https://github.com/adrianomedina-amssoft/amssoft-speedtest-control/re
 - conexão HTTPS com o GitHub e com o serviço de licenciamento;
 - licença comercial válida para liberar as operações e os medidores.
 
-A partir da versão 1.0.12, instalação e migração pelo instalador configuram
-DNS públicos `1.1.1.1` e `8.8.8.8`, com backup do estado anterior. Estes
-resolvedores precisam estar acessíveis por UDP/TCP 53. Redes que dependem de
-zonas DNS privadas devem avaliar essa política antes de instalar ou atualizar.
-O download inicial ainda depende de o DNS existente resolver o GitHub.
-
 ## Primeiro acesso
 
 Depois da instalação, o painel poderá ser aberto pelo endereço IP da VM. O
